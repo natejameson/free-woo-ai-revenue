@@ -1,0 +1,53 @@
+{
+	"$schema": "https://playground.wordpress.net/blueprint-schema.json",
+	"meta": {
+		"title": "AI Revenue Tracker demo store",
+		"description": "A sample WooCommerce store with 90 days of orders and AI sales, so you can see the AI Revenue dashboard filled in.",
+		"author": "natejameson"
+	},
+	"landingPage": "/wp-admin/admin.php?page=airt",
+	"preferredVersions": {
+		"php": "8.2",
+		"wp": "latest"
+	},
+	"features": {
+		"networking": true
+	},
+	"login": true,
+	"steps": [
+		{
+			"step": "installPlugin",
+			"pluginData": {
+				"resource": "wordpress.org/plugins",
+				"slug": "woocommerce"
+			},
+			"options": {
+				"activate": true
+			}
+		},
+		{
+			"step": "installPlugin",
+			"pluginData": {
+				"resource": "git:directory",
+				"url": "https://github.com/natejameson/free-woo-ai-revenue",
+				"ref": "main",
+				"path": "ai-revenue-tracker"
+			},
+			"options": {
+				"activate": true
+			}
+		},
+		{
+			"step": "writeFile",
+			"path": "/wordpress/airt-demo-seed.php",
+			"data": {
+				"resource": "url",
+				"url": "https://raw.githubusercontent.com/natejameson/free-woo-ai-revenue/main/demo/seed.php"
+			}
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/airt-demo-seed.php'; echo airt_demo_seed();"
+		}
+	]
+}
