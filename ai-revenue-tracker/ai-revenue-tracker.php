@@ -3,7 +3,7 @@
  * Plugin Name:          AI Revenue Tracker for WooCommerce
  * Plugin URI:           https://example.com/ai-revenue-tracker
  * Description:          See how much ChatGPT, Perplexity, Gemini, Claude, Copilot and AI shopping agents sell for your WooCommerce store. Server-side AI sales attribution, AI agent order tagging and an AI crawler log.
- * Version:              0.1.0
+ * Version:              0.2.0
  * Requires at least:    6.4
  * Requires PHP:         7.4
  * Requires Plugins:     woocommerce
@@ -19,7 +19,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'AIRT_VERSION', '0.1.0' );
+define( 'AIRT_VERSION', '0.2.0' );
 define( 'AIRT_FILE', __FILE__ );
 define( 'AIRT_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AIRT_URL', plugin_dir_url( __FILE__ ) );
@@ -46,6 +46,15 @@ require_once AIRT_DIR . 'includes/class-airt-bot-log.php';
 require_once AIRT_DIR . 'includes/class-airt-survey.php';
 require_once AIRT_DIR . 'includes/class-airt-reports.php';
 require_once AIRT_DIR . 'includes/class-airt-admin.php';
+
+/**
+ * True when the Pro add-on is active and licensed.
+ *
+ * @return bool
+ */
+function airt_is_pro() {
+	return (bool) apply_filters( 'airt_is_pro', false );
+}
 
 register_activation_hook( __FILE__, array( 'AIRT_Install', 'activate' ) );
 register_deactivation_hook( __FILE__, array( 'AIRT_Install', 'deactivate' ) );

@@ -33,3 +33,4 @@
 	.airt .airt-grid { grid-template-columns: 1fr; }
 	.airt .airt-hero-line { font-size: 18px; }
 }
+.airt .airt-big { font-size: 20px; font-weight: 600; margin: 0 0 12px; }

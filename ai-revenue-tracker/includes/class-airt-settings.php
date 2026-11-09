@@ -17,7 +17,6 @@ final class AIRT_Settings {
 	public static function defaults() {
 		return array(
 			'survey'         => 1,
-			'likely'         => 1,
 			'bot_log'        => 1,
 			'visits'         => 1,
 			'cookie_days'    => 30,
@@ -53,7 +52,7 @@ final class AIRT_Settings {
 		$input = is_array( $input ) ? $input : array();
 		$out   = array();
 
-		foreach ( array( 'survey', 'likely', 'bot_log', 'visits', 'delete_data' ) as $flag ) {
+		foreach ( array( 'survey', 'bot_log', 'visits', 'delete_data' ) as $flag ) {
 			$out[ $flag ] = empty( $input[ $flag ] ) ? 0 : 1;
 		}
 

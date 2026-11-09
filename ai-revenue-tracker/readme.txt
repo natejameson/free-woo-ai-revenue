@@ -6,7 +6,7 @@ Tested up to: 7.1
 Requires PHP: 7.4
 WC requires at least: 8.5
 WC tested up to: 11.2
-Stable tag: 0.1.0
+Stable tag: 0.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -22,21 +22,25 @@ Most of this revenue is invisible today. ChatGPT often sends visitors with no re
 
 * **AI click-throughs.** Shoppers who arrive from ChatGPT, Perplexity, Gemini, Claude, Copilot, Meta AI, Grok, DeepSeek, Mistral and You.com, detected by referrer and by the tracking tags AI apps add to links. Works with page caching.
 * **AI agent orders.** Orders placed by AI agents through the WooCommerce API or agentic checkout, tagged automatically.
-* **AI crawlers.** Which AI bots read your product pages (OAI-SearchBot, GPTBot, ChatGPT-User, PerplexityBot, ClaudeBot, Applebot, Amazonbot and more), verified against the IP ranges AI companies publish, so fake bots are filtered out.
+* **AI crawlers.** How often AI bots read your store, split into AI search, live shopper requests and model training. Bots are checked against the IP ranges AI companies publish.
 * **"How did you find us?"** An optional one-click question on the order confirmation page that catches AI-influenced sales with no digital trace.
 * **Past orders.** On activation it scans your last 180 days of orders using WooCommerce's built-in order attribution, so you see AI revenue from day one.
 
 **What you see**
 
 * "AI sold $X for you this month", with share of store revenue
-* Revenue, orders and visits by AI assistant
-* Which products AI sells and which products AI crawlers read most
-* AI average order value compared with your store average
+* Revenue, orders and visits by AI assistant, for the last 7 or 30 days
+* AI revenue per day, and AI average order value compared with your store average
+* How each AI sale was detected
 * An "AI source" column on the orders screen and an AI attribution box on each order
 
 **Honest numbers**
 
-Confirmed AI sales (agent orders, AI click-throughs and customer answers) are kept separate from estimates. The optional "likely AI" estimate is always labelled and never added to your confirmed total.
+Only confirmed AI sales are counted: agent orders, AI click-throughs and customer answers. Nothing is guessed.
+
+**AI Revenue Tracker Pro**
+
+An optional paid add-on shows which products AI sells, every AI crawler by name with fake bots filtered out, a clearly labelled estimate for AI sales that left no trace, 90-day and 12-month history, the recent AI orders list and CSV export. Everything in this free plugin keeps working without it.
 
 **Private by design**
 
@@ -90,6 +94,10 @@ Yes. It supports High-Performance Order Storage and both classic and block check
 4. AI source column on the orders screen.
 
 == Changelog ==
+
+= 0.2.0 =
+* Hooks for the optional Pro add-on.
+* Simpler crawler summary in the free dashboard.
 
 = 0.1.0 =
 * First release.

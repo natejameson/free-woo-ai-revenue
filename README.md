@@ -2,7 +2,9 @@
 
 See how much ChatGPT, Perplexity, Gemini, Claude, Copilot and AI shopping agents sell for a WooCommerce store.
 
-![AI Revenue dashboard with demo data](demo/screenshot-dashboard.png)
+![AI Revenue dashboard with demo data](demo/screenshot-free.png)
+
+An optional paid add-on, AI Revenue Tracker Pro, adds products AI sold, every AI crawler by name, a likely-AI estimate, 12-month history and CSV export.
 
 ## What's here
 

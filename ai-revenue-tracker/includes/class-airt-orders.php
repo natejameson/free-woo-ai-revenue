@@ -28,6 +28,15 @@ final class AIRT_Orders {
 	}
 
 	/**
+	 * The "likely AI" estimate is a Pro feature; Pro turns it on with this filter.
+	 *
+	 * @return bool
+	 */
+	public static function likely_enabled() {
+		return (bool) apply_filters( 'airt_likely_enabled', false );
+	}
+
+	/**
 	 * @return string[]
 	 */
 	public static function paid_statuses() {
@@ -114,7 +123,7 @@ final class AIRT_Orders {
 			$agent = AIRT_Agent_Orders::from_order( $order );
 		}
 
-		$likely      = (bool) AIRT_Settings::get( 'likely' );
+		$likely      = self::likely_enabled();
 		$source_type = (string) $order->get_meta( '_wc_order_attribution_source_type' );
 
 		$signals = array(

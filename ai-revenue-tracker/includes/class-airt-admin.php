@@ -146,7 +146,7 @@ final class AIRT_Admin {
 		$days = $d['days'];
 
 		echo '<div class="airt-range">';
-		foreach ( array( 7, 30, 90 ) as $r ) {
+		foreach ( AIRT_Reports::ranges() as $r ) {
 			printf(
 				'<a class="button %1$s" href="%2$s">%3$s</a>',
 				$r === $days ? 'button-primary' : '',
@@ -186,9 +186,7 @@ final class AIRT_Admin {
 			sprintf( __( '%s of store revenue', 'ai-revenue-tracker' ), self::pct( $c['revenue'], $store['revenue'] ) ),
 		);
 		echo '<p class="airt-hero-sub">' . esc_html( implode( ' · ', $sub ) );
-		if ( $d['likely']['orders'] > 0 ) {
-			echo ' · <span class="airt-estimate">+ ' . self::money( $d['likely']['revenue'] ) . ' ' . esc_html__( 'likely from AI (estimate, not included)', 'ai-revenue-tracker' ) . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-		}
+		do_action( 'airt_dashboard_hero', $d );
 		echo '</p>';
 		if ( 0 === $c['orders'] ) {
 			echo '<p class="airt-muted">' . esc_html__( 'No confirmed AI sales in this period yet. Tracking is live from now on, and past orders are checked using WooCommerce order attribution.', 'ai-revenue-tracker' ) . '</p>';
@@ -234,33 +232,37 @@ final class AIRT_Admin {
 		);
 		echo '<table class="widefat striped"><tbody>';
 		foreach ( AIRT_Classifier::channel_labels() as $ch => $label ) {
+			if ( AIRT_Classifier::CHANNEL_LIKELY === $ch && ! AIRT_Orders::likely_enabled() ) {
+				continue;
+			}
 			$row = isset( $d['by_channel'][ $ch ] ) ? $d['by_channel'][ $ch ] : array( 'revenue' => 0, 'orders' => 0 );
 			echo '<tr><td><strong>' . esc_html( $label ) . '</strong><br><span class="airt-muted">' . esc_html( $help[ $ch ] ) . '</span></td><td class="num">' . esc_html( number_format_i18n( $row['orders'] ) ) . '</td><td class="num">' . self::money( $row['revenue'] ) . '</td></tr>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		}
 		echo '</tbody></table></section>';
 
-		// Top products.
-		echo '<section class="airt-card"><h2>' . esc_html__( 'Products AI sold', 'ai-revenue-tracker' ) . '</h2>';
-		if ( empty( $d['products'] ) ) {
-			echo '<p class="airt-muted">' . esc_html__( 'Nothing yet.', 'ai-revenue-tracker' ) . '</p>';
-		} else {
-			echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'Product', 'ai-revenue-tracker' ) . '</th><th class="num">' . esc_html__( 'Qty', 'ai-revenue-tracker' ) . '</th><th class="num">' . esc_html__( 'Revenue', 'ai-revenue-tracker' ) . '</th></tr></thead><tbody>';
-			foreach ( $d['products'] as $pid => $p ) {
-				$link = $pid ? get_edit_post_link( $pid ) : '';
-				$name = $link ? '<a href="' . esc_url( $link ) . '">' . esc_html( $p['name'] ) . '</a>' : esc_html( $p['name'] );
-				echo '<tr><td>' . $name . '</td><td class="num">' . esc_html( number_format_i18n( $p['qty'] ) ) . '</td><td class="num">' . self::money( $p['revenue'] ) . '</td></tr>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-			}
-			echo '</tbody></table>';
+		if ( apply_filters( 'airt_free_crawler_card', true ) ) {
+			self::crawler_summary( $d );
 		}
-		echo '</section>';
 
-		// Bots.
-		self::bots_card( $d );
+		/**
+		 * Extra dashboard cards (Pro: products AI sold, crawler detail).
+		 *
+		 * @param array $d Dashboard data.
+		 */
+		do_action( 'airt_dashboard_sections', $d );
 
 		echo '</div>';
 
-		self::recent_orders( $d['recent'] );
-		self::pro_box();
+		/**
+		 * Full-width sections below the cards (Pro: recent AI orders, export).
+		 *
+		 * @param array $d Dashboard data.
+		 */
+		do_action( 'airt_dashboard_after', $d );
+
+		if ( ! airt_is_pro() ) {
+			self::pro_box();
+		}
 
 		if ( current_user_can( 'manage_woocommerce' ) ) {
 			printf(
@@ -319,91 +321,69 @@ final class AIRT_Admin {
 	}
 
 	/**
+	 * Free crawler card: totals by purpose. Pro replaces it with the per-bot, per-product view.
+	 *
 	 * @param array $d Summary.
 	 */
-	private static function bots_card( array $d ) {
-		$types = array(
-			'search'   => __( 'AI search index', 'ai-revenue-tracker' ),
-			'agent'    => __( 'Live request for a user', 'ai-revenue-tracker' ),
-			'training' => __( 'Model training', 'ai-revenue-tracker' ),
-		);
-		$bots  = AIRT_Sources::bots();
-
+	private static function crawler_summary( array $d ) {
 		echo '<section class="airt-card"><h2>' . esc_html__( 'AI crawlers reading your store', 'ai-revenue-tracker' ) . '</h2>';
 		if ( ! AIRT_Settings::get( 'bot_log' ) ) {
 			echo '<p class="airt-muted">' . esc_html__( 'The AI crawler log is turned off in Settings.', 'ai-revenue-tracker' ) . '</p></section>';
 			return;
 		}
-		if ( empty( $d['bots'] ) ) {
+
+		$bots   = AIRT_Sources::bots();
+		$totals = array(
+			'search'   => 0,
+			'agent'    => 0,
+			'training' => 0,
+		);
+		foreach ( $d['bots'] as $key => $counts ) {
+			$type = isset( $bots[ $key ] ) ? $bots[ $key ]['type'] : 'training';
+			if ( isset( $totals[ $type ] ) ) {
+				$totals[ $type ] += $counts['bot_v'] + $counts['bot_u'];
+			}
+		}
+		$all = array_sum( $totals );
+
+		if ( ! $all ) {
 			echo '<p class="airt-muted">' . esc_html__( 'No AI crawler visits recorded yet. Visits to cached pages may not be counted.', 'ai-revenue-tracker' ) . '</p></section>';
 			return;
 		}
 
-		$fake = 0;
-		echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'Bot', 'ai-revenue-tracker' ) . '</th><th>' . esc_html__( 'Purpose', 'ai-revenue-tracker' ) . '</th><th class="num">' . esc_html__( 'Visits', 'ai-revenue-tracker' ) . '</th></tr></thead><tbody>';
-		foreach ( $d['bots'] as $key => $counts ) {
-			$fake += $counts['bot_x'];
-			$real  = $counts['bot_v'] + $counts['bot_u'];
-			if ( ! $real ) {
-				continue;
-			}
-			$label = isset( $bots[ $key ] ) ? $bots[ $key ]['label'] : $key;
-			$type  = isset( $bots[ $key ], $types[ $bots[ $key ]['type'] ] ) ? $types[ $bots[ $key ]['type'] ] : '';
-			$badge = $counts['bot_v'] ? ' <span class="airt-badge" title="' . esc_attr__( 'Checked against the IP ranges this company publishes', 'ai-revenue-tracker' ) . '">' . esc_html__( 'verified', 'ai-revenue-tracker' ) . '</span>' : '';
-			echo '<tr><td>' . esc_html( $label ) . $badge . '</td><td>' . esc_html( $type ) . '</td><td class="num">' . esc_html( number_format_i18n( $real ) ) . '</td></tr>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		/* translators: %s: number of visits */
+		echo '<p class="airt-big">' . esc_html( sprintf( __( '%s visits from AI crawlers', 'ai-revenue-tracker' ), number_format_i18n( $all ) ) ) . '</p>';
+		$labels = array(
+			'search'   => __( 'Building AI search answers', 'ai-revenue-tracker' ),
+			'agent'    => __( 'Fetching pages live for a shopper', 'ai-revenue-tracker' ),
+			'training' => __( 'Collecting model training data', 'ai-revenue-tracker' ),
+		);
+		echo '<table class="widefat striped"><tbody>';
+		foreach ( $totals as $type => $count ) {
+			echo '<tr><td>' . esc_html( $labels[ $type ] ) . '</td><td class="num">' . esc_html( number_format_i18n( $count ) ) . '</td></tr>';
 		}
 		echo '</tbody></table>';
-		if ( $fake ) {
-			/* translators: %s: number of visits */
-			echo '<p class="airt-muted">' . esc_html( sprintf( __( '%s visits pretended to be AI bots but came from the wrong IP addresses. They are excluded above.', 'ai-revenue-tracker' ), number_format_i18n( $fake ) ) ) . '</p>';
-		}
-
-		if ( ! empty( $d['bot_products'] ) ) {
-			echo '<h3>' . esc_html__( 'Most-read products', 'ai-revenue-tracker' ) . '</h3><ol class="airt-list">';
-			foreach ( $d['bot_products'] as $row ) {
-				$title = get_the_title( (int) $row['product_id'] );
-				echo '<li>' . esc_html( $title ? $title : '#' . $row['product_id'] ) . ' <span class="airt-muted">(' . esc_html( number_format_i18n( (int) $row['hits'] ) ) . ')</span></li>';
-			}
-			echo '</ol>';
-		}
+		echo '<p class="airt-muted">' . esc_html__( 'Pro shows which bots, which products they read, and filters out fake bots.', 'ai-revenue-tracker' ) . '</p>';
 		echo '</section>';
 	}
 
-	/**
-	 * @param WC_Order[] $orders Orders.
-	 */
-	private static function recent_orders( array $orders ) {
-		echo '<section class="airt-card"><h2>' . esc_html__( 'Recent AI orders', 'ai-revenue-tracker' ) . '</h2>';
-		if ( empty( $orders ) ) {
-			echo '<p class="airt-muted">' . esc_html__( 'Nothing yet.', 'ai-revenue-tracker' ) . '</p></section>';
-			return;
-		}
-		$labels = AIRT_Classifier::channel_labels();
-		echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'Order', 'ai-revenue-tracker' ) . '</th><th>' . esc_html__( 'Date', 'ai-revenue-tracker' ) . '</th><th>' . esc_html__( 'Assistant', 'ai-revenue-tracker' ) . '</th><th>' . esc_html__( 'How we know', 'ai-revenue-tracker' ) . '</th><th class="num">' . esc_html__( 'Total', 'ai-revenue-tracker' ) . '</th></tr></thead><tbody>';
-		foreach ( $orders as $order ) {
-			$ch = (string) $order->get_meta( '_airt_channel' );
-			printf(
-				'<tr><td><a href="%1$s">#%2$s</a></td><td>%3$s</td><td>%4$s</td><td>%5$s</td><td class="num">%6$s</td></tr>',
-				esc_url( $order->get_edit_order_url() ),
-				esc_html( $order->get_order_number() ),
-				esc_html( $order->get_date_created() ? wc_format_datetime( $order->get_date_created() ) : '' ),
-				esc_html( AIRT_Sources::label( (string) $order->get_meta( '_airt_source' ) ) ),
-				esc_html( isset( $labels[ $ch ] ) ? $labels[ $ch ] : $ch ),
-				wp_kses_post( $order->get_formatted_order_total() )
-			);
-		}
-		echo '</tbody></table></section>';
-	}
-
 	private static function pro_box() {
-		echo '<section class="airt-card airt-pro"><h2>' . esc_html__( 'Next: see why AI picks you, or your competitors', 'ai-revenue-tracker' ) . '</h2>';
-		echo '<ul class="airt-list"><li>' . esc_html__( 'Track the buyer questions where ChatGPT, Gemini and Perplexity recommend your products, and who beats you.', 'ai-revenue-tracker' ) . '</li>';
-		echo '<li>' . esc_html__( 'Get alerted when AI quotes the wrong price, stock or details.', 'ai-revenue-tracker' ) . '</li>';
-		echo '<li>' . esc_html__( 'Send AI orders to GA4 and Meta server-side.', 'ai-revenue-tracker' ) . '</li></ul>';
+		echo '<section class="airt-card airt-pro"><h2>' . esc_html__( 'See exactly what AI is selling, and why', 'ai-revenue-tracker' ) . '</h2>';
+		echo '<p>' . esc_html__( 'AI Revenue Tracker Pro adds:', 'ai-revenue-tracker' ) . '</p>';
+		echo '<ul class="airt-list">';
+		$items = array(
+			__( 'Products AI sold, and the products AI crawlers read most', 'ai-revenue-tracker' ),
+			__( 'Every AI crawler by name, with fake bots filtered out', 'ai-revenue-tracker' ),
+			__( 'Likely-AI estimate for sales that left no trace', 'ai-revenue-tracker' ),
+			__( '90-day and 12-month history, the recent AI orders list, and CSV export', 'ai-revenue-tracker' ),
+			__( 'Coming soon: buyer-question tracking, showing where ChatGPT, Gemini and Perplexity recommend you and who beats you', 'ai-revenue-tracker' ),
+		);
+		foreach ( $items as $item ) {
+			echo '<li>' . esc_html( $item ) . '</li>';
+		}
+		echo '</ul>';
 		if ( AIRT_PRO_URL ) {
-			echo '<p><a class="button button-primary" href="' . esc_url( AIRT_PRO_URL ) . '" target="_blank" rel="noopener">' . esc_html__( 'Join the Pro waitlist', 'ai-revenue-tracker' ) . '</a></p>';
-		} else {
-			echo '<p class="airt-muted">' . esc_html__( 'Coming soon.', 'ai-revenue-tracker' ) . '</p>';
+			echo '<p><a class="button button-primary" href="' . esc_url( AIRT_PRO_URL ) . '" target="_blank" rel="noopener">' . esc_html__( 'Get Pro', 'ai-revenue-tracker' ) . '</a></p>';
 		}
 		echo '</section>';
 	}
@@ -421,7 +401,6 @@ final class AIRT_Admin {
 		echo '<table class="form-table" role="presentation"><tbody>';
 
 		self::checkbox_row( $opt, 'survey', $s, __( 'Post-purchase question', 'ai-revenue-tracker' ), __( 'Ask "How did you find us?" on the order confirmation page. Catches AI-influenced sales that left no trace.', 'ai-revenue-tracker' ) );
-		self::checkbox_row( $opt, 'likely', $s, __( 'Likely-AI estimate', 'ai-revenue-tracker' ), __( 'Flag untracked orders that look like AI referrals. Always shown separately, never added to confirmed totals.', 'ai-revenue-tracker' ) );
 		self::checkbox_row( $opt, 'visits', $s, __( 'Count AI visits', 'ai-revenue-tracker' ), __( 'Count shoppers arriving from AI apps (aggregated per day, no personal data).', 'ai-revenue-tracker' ) );
 		self::checkbox_row( $opt, 'bot_log', $s, __( 'AI crawler log', 'ai-revenue-tracker' ), __( 'Count visits from AI crawlers and agents per product, verified against published IP ranges where available.', 'ai-revenue-tracker' ) );
 
@@ -461,6 +440,12 @@ final class AIRT_Admin {
 			esc_textarea( $s['agent_users'] ),
 			esc_html__( 'If an AI agent integration places orders through a WooCommerce API key, enter the username that owns the key, one per line, optionally with the assistant: "username = chatgpt". Orders it creates are tagged as AI agent orders.', 'ai-revenue-tracker' )
 		);
+
+		/**
+		 * Extra settings rows (Pro: license key, likely-AI estimate).
+		 * Options saved here must be registered to the airt_group settings group.
+		 */
+		do_action( 'airt_settings_rows' );
 
 		self::checkbox_row( $opt, 'delete_data', $s, __( 'Delete data on uninstall', 'ai-revenue-tracker' ), __( 'Remove all counts, settings and AI tags on orders when the plugin is deleted.', 'ai-revenue-tracker' ) );
 

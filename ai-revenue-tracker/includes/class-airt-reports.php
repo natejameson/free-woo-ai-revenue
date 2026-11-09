@@ -38,7 +38,7 @@ final class AIRT_Reports {
 	 * @param int $to   Timestamp.
 	 * @return int[]
 	 */
-	private static function ai_order_ids( $from, $to ) {
+	public static function ai_order_ids( $from, $to ) {
 		global $wpdb;
 		$statuses = self::db_statuses();
 		$in       = implode( ',', array_fill( 0, count( $statuses ), '%s' ) );
@@ -92,11 +92,23 @@ final class AIRT_Reports {
 	}
 
 	/**
-	 * @param int $days 7, 30 or 90.
+	 * Date ranges the dashboard offers. Pro adds longer ones.
+	 *
+	 * @return int[]
+	 */
+	public static function ranges() {
+		$ranges = array_values( array_unique( array_filter( array_map( 'absint', (array) apply_filters( 'airt_dashboard_ranges', array( 7, 30 ) ) ) ) ) );
+		sort( $ranges );
+		return $ranges ? $ranges : array( 30 );
+	}
+
+	/**
+	 * @param int $days Days; must be one of ranges().
 	 * @return array
 	 */
 	public static function summary( $days ) {
-		$days     = in_array( (int) $days, array( 7, 30, 90 ), true ) ? (int) $days : 30;
+		$allowed  = self::ranges();
+		$days     = in_array( (int) $days, $allowed, true ) ? (int) $days : ( in_array( 30, $allowed, true ) ? 30 : $allowed[0] );
 		$to       = time();
 		$from     = $to - $days * DAY_IN_SECONDS;
 		$from_day = wp_date( 'Y-m-d', $from );
